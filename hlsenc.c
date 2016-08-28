@@ -111,7 +111,7 @@ typedef struct HLSContext {
     int nb_entries;
     int discontinuity_set;
 
-    time_t time_stramp;	//current system time.By tony
+    time_t time_stamp;	//current system time.By tony
     int64_t next_ts_start; //get the global position of the stream
 
     HLSSegment *segments;
@@ -607,8 +607,8 @@ static int hls_start(AVFormatContext *s)
             //get the timestramp
             struct tm *tmp;
             tmp = localtime(&now0);
-            c->time_stramp = mktime(tmp);
-            av_log(NULL, AV_LOG_INFO, "%d\n", c->time_stramp);
+            c->time_stamp = mktime(tmp);
+            av_log(NULL, AV_LOG_INFO, "%d\n", c->time_stamp);
             //get the timestramp
 
             if (!strftime(oc->filename, sizeof(oc->filename), c->basename, tm)) {
@@ -1129,19 +1129,19 @@ static int hls_saveIdx(AVFormatContext *s)
 //	}
 
 	/* write out idx.By tony */
-	av_log(NULL, AV_LOG_INFO, "20160830hls->time_stramp: %d, hls->number: %d\n", hls->time_stramp, hls->number);
-	time_t time_stramp;
+	av_log(NULL, AV_LOG_INFO, "20160830hls->time_stamp: %d, hls->number: %d\n", hls->time_stamp, hls->number);
+	time_t time_stamp;
 	if (0 == ((hls->number)%18)) {
-		time_stramp = hls->time_stramp + 10*17;
+		time_stamp = hls->time_stamp + 10*17;
 	} else {
-		time_stramp = hls->time_stramp + 10*((hls->number)%18 - 1); //18 ts do a circul
+		time_stamp = hls->time_stamp + 10*((hls->number)%18 - 1); //18 ts do a circul
 	}
 
 	avio_printf(g_idx_out, "%d \t%s \t%10"PRIi64" \t%10"PRIi64" \t%d\n",
-			time_stramp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
+			time_stamp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
 
     av_log(NULL,AV_LOG_INFO, "20160826timestramp:%d, filename:%s\t,size:%"PRIi64"\t,start_pos:%"PRIi64"\t,duration:%f\n",
-    		time_stramp, av_basename(hls->avf->filename), hls->size, hls->start_pos,hls->duration);
+    		time_stamp, av_basename(hls->avf->filename), hls->size, hls->start_pos,hls->duration);
 
 	return 0;
 }
