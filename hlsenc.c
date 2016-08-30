@@ -829,16 +829,9 @@ static int hls_write_header(AVFormatContext *s)
     char tmp[256], normal_index[256];
     const char *ptr_index = hls->basename;
 
-    av_log(NULL, AV_LOG_INFO, "%s\n", ptr_index);
-
     int len_index = av_basename(ptr_index) - ptr_index;
     strncpy(tmp, ptr_index, len_index);
-
-    av_log(NULL, AV_LOG_INFO, "%s\n", tmp);
-
     snprintf(normal_index, sizeof(normal_index), "%snormal.index", tmp);
-
-    av_log(NULL, AV_LOG_INFO, "%s\n", normal_index);
 
     if ((ret = s->io_open(s, &g_normal_index, normal_index, AVIO_FLAG_WRITE, NULL)) < 0) {
     	ff_format_io_close(s, &g_normal_index);
@@ -1078,19 +1071,25 @@ static int hls_idx_start(AVFormatContext *s)
 {
 	av_log(NULL, AV_LOG_INFO, "%s\n", __FUNCTION__);
 	HLSContext *hls = s->priv_data;
-	hls->start_pos = 0;
+	hls->start_pos = 0; //open a new idx.
 
 	char idx_filename[512];
+	char tmp_ptr[256];
 	int ret = 0;
 	char *hls_filename = hls->avf->filename;
 	int maxlen = strlen(hls_filename) - 3;
-	char *tmp_ptr = subString(idx_filename, hls_filename, 0, maxlen);
+//	char *tmp_ptr = subString(idx_filename, hls_filename, 0, maxlen);
+	strncpy(tmp_ptr, hls_filename, maxlen);
+
+	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_ptr);
 
 	char tmp_file[512];
 	snprintf(tmp_file, sizeof(tmp_file), "%s.idx", tmp_ptr);
 
 	/*write out normal index.By tony*/
 	avio_printf(g_normal_index, "%s\n", tmp_file);
+
+	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_file);
 
 	if ((ret = s->io_open(s, &g_idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
 		ff_format_io_close(s, &g_idx_out);
