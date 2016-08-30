@@ -826,7 +826,20 @@ static int hls_write_header(AVFormatContext *s)
     }
 
     /*open normal index file.By tony*/
-    const char *normal_index = "/home/ubuntu01/Desktop/TS_hls/normal.index";
+    char tmp[256], normal_index[256];
+    const char *ptr_index = hls->basename;
+
+    av_log(NULL, AV_LOG_INFO, "%s\n", ptr_index);
+
+    int len_index = av_basename(ptr_index) - ptr_index;
+    strncpy(tmp, ptr_index, len_index);
+
+    av_log(NULL, AV_LOG_INFO, "%s\n", tmp);
+
+    snprintf(normal_index, sizeof(normal_index), "%snormal.index", tmp);
+
+    av_log(NULL, AV_LOG_INFO, "%s\n", normal_index);
+
     if ((ret = s->io_open(s, &g_normal_index, normal_index, AVIO_FLAG_WRITE, NULL)) < 0) {
     	ff_format_io_close(s, &g_normal_index);
     	return ret;
@@ -1077,8 +1090,7 @@ static int hls_idx_start(AVFormatContext *s)
 	snprintf(tmp_file, sizeof(tmp_file), "%s.idx", tmp_ptr);
 
 	/*write out normal index.By tony*/
-	char *index_name = av_basename(tmp_file);
-	avio_printf(g_normal_index, "%s\n", index_name);
+	avio_printf(g_normal_index, "%s\n", tmp_file);
 
 	if ((ret = s->io_open(s, &g_idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
 		ff_format_io_close(s, &g_idx_out);
