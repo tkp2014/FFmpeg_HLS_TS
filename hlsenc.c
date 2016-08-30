@@ -47,7 +47,7 @@
 #define NumberOf10S_TS 18
 static int execute_order = 0;
 AVIOContext *g_idx_out = NULL; //output idx
-
+AVIOContext *g_normal_index = NULL;
 
 
 typedef struct HLSSegment {
@@ -111,7 +111,7 @@ typedef struct HLSContext {
     int nb_entries;
     int discontinuity_set;
 
-    time_t time_stamp;	//current system time.By tony
+    time_t time_stramp;	//current system time.By tony
     int64_t next_ts_start; //get the global position of the stream
 
     HLSSegment *segments;
@@ -607,8 +607,8 @@ static int hls_start(AVFormatContext *s)
             //get the timestramp
             struct tm *tmp;
             tmp = localtime(&now0);
-            c->time_stamp = mktime(tmp);
-            av_log(NULL, AV_LOG_INFO, "%d\n", c->time_stamp);
+            c->time_stramp = mktime(tmp);
+            av_log(NULL, AV_LOG_INFO, "%d\n", c->time_stramp);
             //get the timestramp
 
             if (!strftime(oc->filename, sizeof(oc->filename), c->basename, tm)) {
@@ -825,11 +825,19 @@ static int hls_write_header(AVFormatContext *s)
         av_strlcat(hls->vtt_basename, vtt_pattern, vtt_basename_size);
     }
 
+    /*open normal index file.By tony*/
+    const char *normal_index = "/home/ubuntu01/Desktop/TS_hls/normal.index";
+    if ((ret = s->io_open(s, &g_normal_index, normal_index, AVIO_FLAG_WRITE, NULL)) < 0) {
+    	ff_format_io_close(s, &g_normal_index);
+    	return ret;
+    }
+
     if ((ret = hls_mux_init(s)) < 0)
         goto fail;
 
     if ((ret = hls_start(s)) < 0)
         goto fail;
+
 
     av_dict_copy(&options, hls->format_options, 0);
     ret = avformat_write_header(hls->avf, &options);
@@ -1011,20 +1019,20 @@ char *subString(char *destin, const char *source, int start, int maxlen)
 {
 	 char *p;
 	 char *address;
-	 int  n = 0; /*×Ö·û´®µÄ³¤¶È*/
+	 int  n = 0; /*å­—ç¬¦ä¸²çš„é•¿åº¦*/
 	 int  oldstart;
 	 int  i;
 
 	 assert((destin != NULL) && (source != NULL));
 	 address = destin;
-	 /*Çó×Ö·û´®³¤¶È*/
+	 /*æ±‚å­—ç¬¦ä¸²é•¿åº¦*/
 	 p = source;
 	 while (*p++ != '\0') {
 		 n++;
 	 }
-	 /*ÈôstartÎª¸ºÊı£¬Ôò´ÓºóÍùÇ°*/
+	 /*è‹¥startä¸ºè´Ÿæ•°ï¼Œåˆ™ä»åå¾€å‰*/
 	 if(start < 0) {
-		 /*Èç¹û¿ªÊ¼µÄÎ»ÖÃ³¬¹ı×Ö·û´®³¤¶È£¬Ôò²»½øĞĞ½ØÈ¡*/
+		 /*å¦‚æœå¼€å§‹çš„ä½ç½®è¶…è¿‡å­—ç¬¦ä¸²é•¿åº¦ï¼Œåˆ™ä¸è¿›è¡Œæˆªå–*/
 		 if(-start > n-1) {
 			 return  NULL;
 		 }
@@ -1035,7 +1043,7 @@ char *subString(char *destin, const char *source, int start, int maxlen)
 			 maxlen += oldstart;
 		 }
 	 }
-	 /*Èç¹û¿ªÊ¼µÄÎ»ÖÃ³¬¹ı×Ö·û´®³¤¶È£¬Ôò²»½øĞĞ½ØÈ¡*/
+	 /*å¦‚æœå¼€å§‹çš„ä½ç½®è¶…è¿‡å­—ç¬¦ä¸²é•¿åº¦ï¼Œåˆ™ä¸è¿›è¡Œæˆªå–*/
 	 if(start > n-1) {
 		 return   NULL;
 	 }
@@ -1067,6 +1075,10 @@ static int hls_idx_start(AVFormatContext *s)
 
 	char tmp_file[512];
 	snprintf(tmp_file, sizeof(tmp_file), "%s.idx", tmp_ptr);
+
+	/*write out normal index.By tony*/
+	char *index_name = av_basename(tmp_file);
+	avio_printf(g_normal_index, "%s\n", index_name);
 
 	if ((ret = s->io_open(s, &g_idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
 		ff_format_io_close(s, &g_idx_out);
@@ -1129,19 +1141,19 @@ static int hls_saveIdx(AVFormatContext *s)
 //	}
 
 	/* write out idx.By tony */
-	av_log(NULL, AV_LOG_INFO, "20160830hls->time_stamp: %d, hls->number: %d\n", hls->time_stamp, hls->number);
-	time_t time_stamp;
+	av_log(NULL, AV_LOG_INFO, "20160830hls->time_stramp: %d, hls->number: %d\n", hls->time_stramp, hls->number);
+	time_t time_stramp;
 	if (0 == ((hls->number)%18)) {
-		time_stamp = hls->time_stamp + 10*17;
+		time_stramp = hls->time_stramp + 10*17;
 	} else {
-		time_stamp = hls->time_stamp + 10*((hls->number)%18 - 1); //18 ts do a circul
+		time_stramp = hls->time_stramp + 10*((hls->number)%18 - 1); //18 ts do a circul
 	}
 
 	avio_printf(g_idx_out, "%d \t%s \t%10"PRIi64" \t%10"PRIi64" \t%d\n",
-			time_stamp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
+			time_stramp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
 
     av_log(NULL,AV_LOG_INFO, "20160826timestramp:%d, filename:%s\t,size:%"PRIi64"\t,start_pos:%"PRIi64"\t,duration:%f\n",
-    		time_stamp, av_basename(hls->avf->filename), hls->size, hls->start_pos,hls->duration);
+    		time_stramp, av_basename(hls->avf->filename), hls->size, hls->start_pos,hls->duration);
 
 	return 0;
 }
@@ -1277,6 +1289,7 @@ static int hls_write_trailer(struct AVFormatContext *s)
         ff_format_io_close(s, &oc->pb);
         hls_append_segment(s, hls, hls->duration, hls->start_pos, hls->size);
         ff_format_io_close(s, &g_idx_out); //By tony
+        ff_format_io_close(s, &g_normal_index); //By tony
     }
 
     if (vtt_oc) {
