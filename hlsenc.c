@@ -1073,7 +1073,6 @@ static int hls_idx_start(AVFormatContext *s)
 	HLSContext *hls = s->priv_data;
 	hls->start_pos = 0; //open a new idx.
 
-	char idx_filename[512];
 	char tmp_ptr[256];
 	int ret = 0;
 	char *hls_filename = hls->avf->filename;
@@ -1081,15 +1080,15 @@ static int hls_idx_start(AVFormatContext *s)
 //	char *tmp_ptr = subString(idx_filename, hls_filename, 0, maxlen);
 	strncpy(tmp_ptr, hls_filename, maxlen);
 
-	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_ptr);
+//	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_ptr);
 
 	char tmp_file[512];
 	snprintf(tmp_file, sizeof(tmp_file), "%s.idx", tmp_ptr);
 
 	/*write out normal index.By tony*/
-	avio_printf(g_normal_index, "%s\n", tmp_file);
+	avio_printf(g_normal_index, "%s\n", av_basename(tmp_file));
 
-	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_file);
+//	av_log(NULL, AV_LOG_INFO, "%s\n", av_basename(tmp_file));
 
 	if ((ret = s->io_open(s, &g_idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
 		ff_format_io_close(s, &g_idx_out);
