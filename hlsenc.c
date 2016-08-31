@@ -44,7 +44,7 @@
 
 /* By tony */
 #define WD_ThreeMinTS 1
-#define NumberOf10S_TS 18
+const int num_10sec_ts = 18;
 static int execute_order = 0;
 AVIOContext *g_idx_out = NULL; //output idx
 AVIOContext *g_normal_index = NULL;
@@ -111,7 +111,7 @@ typedef struct HLSContext {
     int nb_entries;
     int discontinuity_set;
 
-    time_t time_stramp;	//current system time.By tony
+    time_t time_stamp;	//current system time.By tony
     int64_t next_ts_start; //get the global position of the stream
 
     HLSSegment *segments;
@@ -464,7 +464,7 @@ static int hls_window(AVFormatContext *s, int last)
     int64_t sequence = FFMAX(hls->start_sequence, hls->sequence - hls->nb_entries);
 
     /* By tony */
-    av_log(NULL, AV_LOG_INFO, "008sequence: %d\n", hls->sequence);
+    av_log(NULL, AV_LOG_DEBUG, "008sequence: %d\n", hls->sequence);
 
     int version = hls->flags & HLS_SINGLE_FILE ? 4 : 3;
     const char *proto = avio_find_protocol_name(s->filename);
@@ -607,8 +607,8 @@ static int hls_start(AVFormatContext *s)
             //get the timestramp
             struct tm *tmp;
             tmp = localtime(&now0);
-            c->time_stramp = mktime(tmp);
-            av_log(NULL, AV_LOG_INFO, "%d\n", c->time_stramp);
+            c->time_stamp = mktime(tmp);
+            av_log(NULL, AV_LOG_DEBUG, "%d\n", c->time_stamp);
             //get the timestramp
 
             if (!strftime(oc->filename, sizeof(oc->filename), c->basename, tm)) {
@@ -1069,7 +1069,7 @@ char *subString(char *destin, const char *source, int start, int maxlen)
  */
 static int hls_idx_start(AVFormatContext *s)
 {
-	av_log(NULL, AV_LOG_INFO, "%s\n", __FUNCTION__);
+	av_log(NULL, AV_LOG_DEBUG, "%s\n", __FUNCTION__);
 	HLSContext *hls = s->priv_data;
 	hls->start_pos = 0; //open a new idx.
 
@@ -1080,7 +1080,7 @@ static int hls_idx_start(AVFormatContext *s)
 //	char *tmp_ptr = subString(idx_filename, hls_filename, 0, maxlen);
 	strncpy(tmp_ptr, hls_filename, maxlen);
 
-//	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_ptr);
+//	av_log(NULL, AV_LOG_DEBUG, "%s\n", tmp_ptr);
 
 	char tmp_file[512];
 	snprintf(tmp_file, sizeof(tmp_file), "%s.idx", tmp_ptr);
@@ -1088,7 +1088,7 @@ static int hls_idx_start(AVFormatContext *s)
 	/*write out normal index.By tony*/
 	avio_printf(g_normal_index, "%s\n", av_basename(tmp_file));
 
-//	av_log(NULL, AV_LOG_INFO, "%s\n", av_basename(tmp_file));
+//	av_log(NULL, AV_LOG_DEBUG, "%s\n", av_basename(tmp_file));
 
 	if ((ret = s->io_open(s, &g_idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
 		ff_format_io_close(s, &g_idx_out);
@@ -1113,7 +1113,7 @@ static int hls_get_idx(AVFormatContext *s)
 	int maxlen = strlen(base_filename) - 3;
 	tmp_ptr = subString(idx_filename, base_filename, 0, maxlen);
 	strcat(tmp_ptr, ".idx");
-	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_ptr);
+	av_log(NULL, AV_LOG_DEBUG, "%s\n", tmp_ptr);
 
 	if ((ret = s->io_open(s, &idx_out, tmp_ptr, AVIO_FLAG_WRITE, &options)) < 0) {
 		ff_format_io_close(s, &idx_out);
@@ -1122,7 +1122,7 @@ static int hls_get_idx(AVFormatContext *s)
 	avio_printf(idx_out, "%s\t, %"PRIi64"\t, start_pos:%"PRIi64"\t, duration:%f\n",
 					tmp_ptr, hls->size, hls->start_pos, hls->duration);
 
-	av_log(NULL, AV_LOG_INFO, "%s\n", tmp_ptr);
+	av_log(NULL, AV_LOG_DEBUG, "%s\n", tmp_ptr);
 	ff_format_io_close(s, &idx_out);
 
 	return 1;
@@ -1133,7 +1133,7 @@ static int hls_get_idx(AVFormatContext *s)
  */
 static int hls_saveIdx(AVFormatContext *s)
 {
-	av_log(NULL, AV_LOG_INFO, "%s\n", __FUNCTION__);
+	av_log(NULL, AV_LOG_DEBUG, "%s\n", __FUNCTION__);
     HLSContext *hls = s->priv_data;
 
     char idx_filename[512];
@@ -1151,19 +1151,19 @@ static int hls_saveIdx(AVFormatContext *s)
 //	}
 
 	/* write out idx.By tony */
-	av_log(NULL, AV_LOG_INFO, "20160830hls->time_stramp: %d, hls->number: %d\n", hls->time_stramp, hls->number);
-	time_t time_stramp;
-	if (0 == ((hls->number)%18)) {
-		time_stramp = hls->time_stramp + 10*17;
+	av_log(NULL, AV_LOG_DEBUG, "20160830hls->time_stamp: %d, hls->number: %d\n", hls->time_stamp, hls->number);
+	time_t time_stamp;
+	if (0 == ((hls->number)%num_10sec_ts) ) {
+		time_stamp = hls->time_stamp + 10*(num_10sec_ts - 1);
 	} else {
-		time_stramp = hls->time_stramp + 10*((hls->number)%18 - 1); //18 ts do a circul
+		time_stamp = hls->time_stamp + 10*((hls->number)%(num_10sec_ts) - 1); //18 ts do a cycle
 	}
 
 	avio_printf(g_idx_out, "%d \t%s \t%10"PRIi64" \t%10"PRIi64" \t%d\n",
-			time_stramp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
+			time_stamp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
 
-    av_log(NULL,AV_LOG_INFO, "20160826timestramp:%d, filename:%s\t,size:%"PRIi64"\t,start_pos:%"PRIi64"\t,duration:%f\n",
-    		time_stramp, av_basename(hls->avf->filename), hls->size, hls->start_pos,hls->duration);
+    av_log(NULL,AV_LOG_DEBUG, "20160826timestramp:%d, filename:%s\t,size:%"PRIi64"\t,start_pos:%"PRIi64"\t,duration:%f\n",
+    		time_stamp, av_basename(hls->avf->filename), hls->size, hls->start_pos,hls->duration);
 
 	return 0;
 }
@@ -1211,7 +1211,7 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
     /* av_compare_ts() is awalys -1 .By tony */
 //	int result = av_compare_ts(pkt->pts - hls->start_pts, st->time_base, end_pts, AV_TIME_BASE_Q);
-//	av_log(NULL, AV_LOG_INFO, "20160812av_compare_ts: %d\n", result); //By tony
+//	av_log(NULL, AV_LOG_DEBUG, "20160812av_compare_ts: %d\n", result); //By tony
 
     if (can_split && av_compare_ts(pkt->pts - hls->start_pts, st->time_base,
                                    end_pts, AV_TIME_BASE_Q) >= 0) {
@@ -1223,7 +1223,7 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
         new_start_pos = avio_tell(hls->avf->pb);
         hls->size = new_start_pos - hls->start_pos;
 
-        av_log(NULL,AV_LOG_INFO, "20160831start_pos:%"PRIi64"\t, new_start_pos:%"PRIi64"\t, size:%"PRIi64"\n",
+        av_log(NULL,AV_LOG_DEBUG, "20160831start_pos:%"PRIi64"\t, new_start_pos:%"PRIi64"\t, size:%"PRIi64"\n",
         		hls->start_pos, new_start_pos, hls->size);
 
         ret = hls_append_segment(s, hls, hls->duration, hls->start_pos, hls->size);
@@ -1250,9 +1250,9 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 
 ///////////////////////////////////////////////////////////////////
 #if WD_ThreeMinTS
-			int datum = hls->number % NumberOf10S_TS;
-			av_log(NULL, AV_LOG_INFO, "20160828%d\n", datum);
-        	if (0 == (hls->number % NumberOf10S_TS)) {
+			int datum = hls->number % num_10sec_ts;
+			av_log(NULL, AV_LOG_DEBUG, "20160828%d\n", datum);
+        	if (0 == (hls->number % num_10sec_ts)) {
 				ff_format_io_close(s, &g_idx_out);//close idx g_idx_out for idx.By tony
 				ff_format_io_close(s, &oc->pb);
 				if (hls->vtt_avf)
