@@ -1,3 +1,9 @@
+/**
+ * 调试hls版本，可以实现index与idx同步更新，写ts功能正常
+ * 完成新协议注册
+ *
+/
+
 /*
  * Apple HTTP Live Streaming segmenter
  * Copyright (c) 2012, Luca Barbato
@@ -86,6 +92,11 @@ typedef struct HLSContext {
     int64_t start_sequence;
     AVOutputFormat *oformat;
     AVOutputFormat *vtt_oformat;
+
+    //identify AVIOContext for idx and index
+    AVIOContext *idx_out; //output idx
+    AVIOContext *normal_index;
+
 
     AVFormatContext *avf;
     AVFormatContext *vtt_avf;
@@ -833,8 +844,8 @@ static int hls_write_header(AVFormatContext *s)
     strncpy(tmp, ptr_index, len_index);
     snprintf(normal_index, sizeof(normal_index), "%snormal.index", tmp);
 
-    if ((ret = s->io_open(s, &g_normal_index, normal_index, AVIO_FLAG_WRITE, NULL)) < 0) {
-    	ff_format_io_close(s, &g_normal_index);
+    if ((ret = s->io_open(s, &hls->normal_index, normal_index, AVIO_FLAG_WRITE, NULL)) < 0) {
+    	ff_format_io_close(s, &hls->normal_index);
     	return ret;
     }
 
@@ -1086,12 +1097,12 @@ static int hls_idx_start(AVFormatContext *s)
 	snprintf(tmp_file, sizeof(tmp_file), "%s.idx", tmp_ptr);
 
 	/*write out normal index.By tony*/
-	avio_printf(g_normal_index, "%s\n", av_basename(tmp_file));
+	avio_printf(hls->normal_index, "%s\n", av_basename(tmp_file));
 
 //	av_log(NULL, AV_LOG_DEBUG, "%s\n", av_basename(tmp_file));
 
-	if ((ret = s->io_open(s, &g_idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
-		ff_format_io_close(s, &g_idx_out);
+	if ((ret = s->io_open(s, &hls->idx_out, tmp_file, AVIO_FLAG_WRITE, NULL)) < 0) {
+		ff_format_io_close(s, &hls->idx_out);
 		return ret;
 	}
 
@@ -1159,7 +1170,7 @@ static int hls_saveIdx(AVFormatContext *s)
 		time_stamp = hls->time_stamp + 10*((hls->number)%(num_10sec_ts) - 1); //18 ts do a cycle
 	}
 
-	avio_printf(g_idx_out, "%d \t%s \t%10"PRIi64" \t%10"PRIi64" \t%d\n",
+	avio_printf(hls->idx_out, "%d \t%s \t%10"PRIi64" \t%10"PRIi64" \t%d\n",
 			time_stamp, av_basename(hls_filename), hls->start_pos, hls->size, (long)hls->duration);
 
     av_log(NULL,AV_LOG_DEBUG, "20160826timestramp:%d, filename:%s\t,size:%"PRIi64"\t,start_pos:%"PRIi64"\t,duration:%f\n",
@@ -1253,8 +1264,9 @@ static int hls_write_packet(AVFormatContext *s, AVPacket *pkt)
 			int datum = hls->number % num_10sec_ts;
 			av_log(NULL, AV_LOG_DEBUG, "20160828%d\n", datum);
         	if (0 == (hls->number % num_10sec_ts)) {
-				ff_format_io_close(s, &g_idx_out);//close idx g_idx_out for idx.By tony
+				ff_format_io_close(s, &hls->idx_out);//close idx g_idx_out for idx.By tony
 				ff_format_io_close(s, &oc->pb);
+				avio_flush(hls->normal_index);
 				if (hls->vtt_avf)
 					ff_format_io_close(s, &hls->vtt_avf->pb);
 
@@ -1298,8 +1310,8 @@ static int hls_write_trailer(struct AVFormatContext *s)
         hls->size = avio_tell(hls->avf->pb) - hls->start_pos;
         ff_format_io_close(s, &oc->pb);
         hls_append_segment(s, hls, hls->duration, hls->start_pos, hls->size);
-        ff_format_io_close(s, &g_idx_out); //By tony
-        ff_format_io_close(s, &g_normal_index); //By tony
+        ff_format_io_close(s, &hls->idx_out); //By tony
+        ff_format_io_close(s, &hls->normal_index); //By tony
     }
 
     if (vtt_oc) {
@@ -1366,7 +1378,7 @@ static const AVClass hls_class = {
 AVOutputFormat ff_hlsplus_muxer = {
     .name           = "hlsplus",
     .long_name      = NULL_IF_CONFIG_SMALL("Apple HTTP Live Streaming Plus"),
-    .extensions     = "tkpm3u8",
+    .extensions     = "m3u8",
     .priv_data_size = sizeof(HLSContext),
     .audio_codec    = AV_CODEC_ID_AAC,
     .video_codec    = AV_CODEC_ID_H264,
